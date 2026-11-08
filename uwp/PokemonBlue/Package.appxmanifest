@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  IgnorableNamespaces="uap">
+  IgnorableNamespaces="uap mp">
 
   <!-- Publisher must match the subject of the signing certificate (uwp/build.ps1). -->
   <Identity
     Name="PokeredUWP.PokemonBlue"
     Publisher="CN=PokeredUWP"
     Version="1.0.0.0" />
+
+  <!-- Required by the packaging tools; must differ between the two apps. -->
+  <mp:PhoneIdentity PhoneProductId="c26e88d1-3779-4bdb-bf9f-f03926a7e1f6" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
   <Properties>
     <DisplayName>Pokémon Blue</DisplayName>

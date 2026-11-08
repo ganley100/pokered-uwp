@@ -1,14 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
-  IgnorableNamespaces="uap">
+  IgnorableNamespaces="uap mp">
 
   <!-- Publisher must match the subject of the signing certificate (uwp/build.ps1). -->
   <Identity
     Name="PokeredUWP.PokemonRed"
     Publisher="CN=PokeredUWP"
     Version="1.0.0.0" />
+
+  <!-- Required by the packaging tools; must differ between the two apps. -->
+  <mp:PhoneIdentity PhoneProductId="52974b80-b948-4fab-8d69-c225489142a5" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
   <Properties>
     <DisplayName>Pokémon Red</DisplayName>
