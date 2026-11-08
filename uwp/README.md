@@ -9,7 +9,13 @@ that run on an Xbox in Developer Mode. They also run on Windows 10 and 11.
 | Pokémon Blue | `PokeredUWP.PokemonBlue`   | `pokeblue.gbc` | `pokeblue.sav` |
 
 Each app has its own tile, colours and save data, so you can install both side
-by side. Inside each app, the game runs on the
+by side.
+
+The emulator acts as a **Super Game Boy**, so the game colours itself the way it
+does on an SGB. Every town, route, menu and Pokémon in battle gets its own
+palette, and the game's own border frames the screen: the red card frame for
+Red, the Poké Ball frame for Blue. On a 16:9 TV the border fills most of the
+width, or you can stretch the picture to fill the screen. Inside each app, the game runs on the
 [Peanut-GB](https://github.com/deltabeard/Peanut-GB) emulator core with the
 minigb_apu sound core (both MIT licensed, in `External/PeanutGB`). The app is a
 C++/WinRT `CoreWindow` app that draws with Direct2D and plays audio with
@@ -87,11 +93,20 @@ deploys the app straight to the console.
 | Fast-forward  | Hold right trigger (4×)     | Hold Tab                    |
 | Colour scheme | Y                           | P                           |
 | Scaling       | Click left stick            | F                           |
+| Border        | Click right stick           | G                           |
 
-There are four colour schemes: the cartridge's Game Boy Color colours (red or
-blue), the original Game Boy green, Game Boy Pocket, and greyscale. Scaling
-switches between pixel-perfect (integer) and fill-the-screen. The app remembers
-both settings.
+- **Colour schemes:** Super Game Boy (the default), then the cartridge's Game
+  Boy Color colours (red or blue), the original Game Boy green, Game Boy Pocket
+  and greyscale.
+- **Scaling:** fit to screen (the default), pixel-perfect (whole-number scale)
+  and stretch to fill the widescreen TV.
+- **Border:** the game's Super Game Boy border, on or off.
+
+The app remembers all three settings.
+
+A true widescreen view, where you see more of the map, isn't possible without
+rewriting the game. It only ever draws 160 x 144 pixels and only keeps the
+visible part of the map up to date.
 
 ## Saves
 
@@ -110,7 +125,8 @@ uwp/
   PokemonBlue/               Blue: project, manifest, tile art
   Shared/
     App.cpp                  CoreWindow app: video, audio, input, saves
-    GbCore.c/.h              C wrapper around the emulator core
+    GbCore.c/.h              C wrapper around the emulator core, plus
+                             Super Game Boy colour and border support
     GameConfig.h             Per-game title, save name and palettes
     GameApp.props/.targets   Shared MSBuild settings; copies the ROM in as Game.gb
   External/PeanutGB/         Vendored emulator and APU cores (MIT)

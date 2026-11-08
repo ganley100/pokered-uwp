@@ -17,6 +17,10 @@ extern "C" {
 #define GBCORE_WIDTH  160
 #define GBCORE_HEIGHT 144
 
+/* Super Game Boy output: the game screen centred in a 256x224 border. */
+#define GBCORE_SGB_WIDTH  256
+#define GBCORE_SGB_HEIGHT 224
+
 /* Button bits for gbcore_set_buttons(). A set bit means "held down". */
 #define GBCORE_BTN_A      0x01
 #define GBCORE_BTN_B      0x02
@@ -63,6 +67,21 @@ void gbcore_run_frame(void);
  * bits 4-5 the layer: 0 = OBJ0, 1 = OBJ1, 2 = BG/window.
  */
 const uint8_t *gbcore_framebuffer(void);
+
+/*
+ * Super Game Boy colour. The emulated console answers the game's SGB
+ * detection, so games with SGB support send it palettes and a border.
+ */
+/* Non-zero once the game has set SGB palettes. */
+int gbcore_sgb_coloured(void);
+/* Non-zero once the game has sent an SGB border. */
+int gbcore_sgb_has_border(void);
+/*
+ * Draw the current frame in SGB colours as 0xAARRGGBB pixels: with_border
+ * gives GBCORE_SGB_WIDTH x GBCORE_SGB_HEIGHT, otherwise GBCORE_WIDTH x
+ * GBCORE_HEIGHT.
+ */
+void gbcore_sgb_render(uint32_t *out, int with_border);
 
 /* Audio produced by the last gbcore_run_frame(): stereo, interleaved int16. */
 unsigned gbcore_audio_sample_rate(void);

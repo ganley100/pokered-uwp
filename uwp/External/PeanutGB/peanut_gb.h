@@ -1098,6 +1098,12 @@ void __gb_write(struct gb_s *gb, uint_fast16_t addr, uint8_t val)
 			else
 				gb->hram_io[IO_JOYP] |= (gb->direct.joypad & 0x0F);
 
+#ifdef PEANUT_GB_JOYP_WRITE_HOOK
+			/* pokered-uwp: lets the front-end see JOYP writes (used to
+			 * receive Super Game Boy command packets). */
+			PEANUT_GB_JOYP_WRITE_HOOK(gb, val);
+#endif
+
 			return;
 
 		/* Serial */

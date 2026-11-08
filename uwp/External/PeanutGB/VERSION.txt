@@ -1,4 +1,6 @@
 Vendored from https://github.com/deltabeard/Peanut-GB
 Commit: d0bcca771c83a2638c93a9ae61f3d51f226dc905
 Files: peanut_gb.h, examples/sdl2/minigb_apu/minigb_apu.{c,h}
-Local changes: none.
+Local changes:
+- peanut_gb.h: optional PEANUT_GB_JOYP_WRITE_HOOK(gb, val) macro, called after
+  each write to the JOYP register (used for Super Game Boy packets).

@@ -53,6 +53,14 @@ namespace
 	constexpr int kSaveCheckInterval = 60; // frames
 	constexpr float kStickThreshold = 0.5f;
 
+	enum class ScaleMode : int32_t
+	{
+		PixelPerfect = 0, // largest whole-number scale that fits
+		Fit = 1,          // as large as fits, keeping the shape
+		Stretch = 2,      // fill the whole screen
+	};
+	constexpr int32_t kScaleModeCount = 3;
+
 	// ------------------------------------------------------------------
 	// File helpers
 	// ------------------------------------------------------------------
@@ -208,8 +216,9 @@ namespace
 				m_d3dDevice.as<IDXGIDevice3>()->Trim();
 		}
 
-		// `pixels` is GBCORE_WIDTH x GBCORE_HEIGHT BGRA, or null for none.
-		void Present(const uint32_t *pixels, bool integerScale,
+		// `pixels` is width x height BGRA (either the 160x144 game screen or
+		// the 256x224 Super Game Boy picture with border), or null for none.
+		void Present(const uint32_t *pixels, UINT width, UINT height, ScaleMode mode,
 			const std::wstring &overlay, const std::wstring &message)
 		{
 			if (!m_targetBitmap)
@@ -221,19 +230,26 @@ namespace
 			const float w = static_cast<float>(m_width);
 			const float h = static_cast<float>(m_height);
 
-			if (pixels)
+			ID2D1Bitmap1 *bitmap = width == GBCORE_SGB_WIDTH ? m_borderBitmap.get() : m_gameBitmap.get();
+			if (pixels && bitmap)
 			{
-				m_gameBitmap->CopyFromMemory(nullptr, pixels, GBCORE_WIDTH * 4);
+				bitmap->CopyFromMemory(nullptr, pixels, width * 4);
 
-				float scale = std::min(w / GBCORE_WIDTH, h / GBCORE_HEIGHT);
-				if (integerScale && scale >= 1.0f)
-					scale = std::floor(scale);
-				const float dw = GBCORE_WIDTH * scale;
-				const float dh = GBCORE_HEIGHT * scale;
+				const float bw = static_cast<float>(width);
+				const float bh = static_cast<float>(height);
+				float dw = w, dh = h;
+				if (mode != ScaleMode::Stretch)
+				{
+					float scale = std::min(w / bw, h / bh);
+					if (mode == ScaleMode::PixelPerfect && scale >= 1.0f)
+						scale = std::floor(scale);
+					dw = bw * scale;
+					dh = bh * scale;
+				}
 				const float x = std::floor((w - dw) / 2);
 				const float y = std::floor((h - dh) / 2);
 				const D2D1_RECT_F dest = D2D1::RectF(x, y, x + dw, y + dh);
-				m_d2dContext->DrawBitmap(m_gameBitmap.get(), &dest, 1.0f,
+				m_d2dContext->DrawBitmap(bitmap, &dest, 1.0f,
 					D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR, nullptr, nullptr);
 			}
 
@@ -285,6 +301,8 @@ namespace
 				D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE), 96.0f, 96.0f);
 			check_hresult(m_d2dContext->CreateBitmap(D2D1::SizeU(GBCORE_WIDTH, GBCORE_HEIGHT),
 				nullptr, 0, &props, m_gameBitmap.put()));
+			check_hresult(m_d2dContext->CreateBitmap(D2D1::SizeU(GBCORE_SGB_WIDTH, GBCORE_SGB_HEIGHT),
+				nullptr, 0, &props, m_borderBitmap.put()));
 
 			check_hresult(m_d2dContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), m_textBrush.put()));
 			check_hresult(m_d2dContext->CreateSolidColorBrush(D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.75f), m_backBrush.put()));
@@ -356,6 +374,7 @@ namespace
 			m_d2dContext = nullptr;
 			m_targetBitmap = nullptr;
 			m_gameBitmap = nullptr;
+			m_borderBitmap = nullptr;
 			m_textBrush = nullptr;
 			m_backBrush = nullptr;
 			m_d2dDevice = nullptr;
@@ -394,6 +413,7 @@ namespace
 		com_ptr<IDXGISwapChain1> m_swapChain;
 		com_ptr<ID2D1Bitmap1> m_targetBitmap;
 		com_ptr<ID2D1Bitmap1> m_gameBitmap;
+		com_ptr<ID2D1Bitmap1> m_borderBitmap;
 		com_ptr<ID2D1SolidColorBrush> m_textBrush;
 		com_ptr<ID2D1SolidColorBrush> m_backBrush;
 		com_ptr<IDWriteTextFormat> m_textFormat;
@@ -408,7 +428,8 @@ namespace
 		uint8_t buttons = 0;     // GBCORE_BTN_*
 		bool fastForward = false;
 		bool nextPalette = false;
-		bool toggleScaling = false;
+		bool nextScaling = false;
+		bool toggleBorder = false;
 	};
 
 	bool Has(GamepadButtons held, GamepadButtons flag)
@@ -465,7 +486,8 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView>
 		m_renderer.Initialize(m_window);
 		m_message = LoadGame();
 		m_audio.Initialize(gbcore_audio_sample_rate(), gbcore_audio_frames_per_video_frame());
-		ShowOverlay(std::wstring(GameConfig::kTitle) + L"   •   Y: colours   •   RT: fast-forward");
+		ShowOverlay(std::wstring(GameConfig::kTitle) +
+			L"   \u2022   Y: colours   \u2022   Right stick: border   \u2022   RT: fast-forward");
 
 		LARGE_INTEGER frequency, last, now;
 		QueryPerformanceFrequency(&frequency);
@@ -525,7 +547,7 @@ struct App : implements<App, IFrameworkViewSource, IFrameworkView>
 			}
 
 			BuildPixels();
-			m_renderer.Present(m_running ? m_pixels.data() : nullptr, m_integerScale,
+			m_renderer.Present(m_running ? m_pixels.data() : nullptr, m_pixelsWidth, m_pixelsHeight, m_scaleMode,
 				m_overlayTime > 0.0 ? m_overlay : std::wstring(), m_message);
 		}
 
@@ -583,19 +605,45 @@ private:
 			gbcore_clear_save_dirty();
 	}
 
+	// Colour mode 0 is the game's own Super Game Boy colours; the rest are
+	// GameConfig::kPalettes.
+	static constexpr int kColourModeCount = 1 + GameConfig::kPaletteCount;
+
+	std::wstring ColourModeName() const
+	{
+		return m_colourMode == 0 ? std::wstring(L"Super Game Boy")
+			: std::wstring(GameConfig::kPalettes[m_colourMode - 1].name);
+	}
+
 	void BuildPixels()
 	{
 		if (!m_running)
 			return;
 
-		const auto &palette = GameConfig::kPalettes[m_paletteIndex];
+		const bool border = m_border && gbcore_sgb_has_border();
+		m_pixelsWidth = border ? GBCORE_SGB_WIDTH : GBCORE_WIDTH;
+		m_pixelsHeight = border ? GBCORE_SGB_HEIGHT : GBCORE_HEIGHT;
+		m_pixels.resize(static_cast<size_t>(m_pixelsWidth) * m_pixelsHeight);
+
+		// The SGB picture supplies the border and, in SGB mode, the screen.
+		if (border || m_colourMode == 0)
+			gbcore_sgb_render(m_pixels.data(), border ? 1 : 0);
+		if (m_colourMode == 0)
+			return;
+
+		const auto &palette = GameConfig::kPalettes[m_colourMode - 1];
 		const uint32_t *layers[4] = { palette.obj0, palette.obj1, palette.bg, palette.bg };
 		const uint8_t *fb = gbcore_framebuffer();
-		m_pixels.resize(GBCORE_WIDTH * GBCORE_HEIGHT);
-		for (size_t i = 0; i < m_pixels.size(); ++i)
+		const UINT ox = (m_pixelsWidth - GBCORE_WIDTH) / 2;
+		const UINT oy = (m_pixelsHeight - GBCORE_HEIGHT) / 2;
+		for (UINT y = 0; y < GBCORE_HEIGHT; ++y)
 		{
-			const uint8_t p = fb[i];
-			m_pixels[i] = 0xFF000000u | layers[(p >> 4) & 3][p & 3];
+			uint32_t *row = &m_pixels[static_cast<size_t>(oy + y) * m_pixelsWidth + ox];
+			for (UINT x = 0; x < GBCORE_WIDTH; ++x)
+			{
+				const uint8_t p = fb[y * GBCORE_WIDTH + x];
+				row[x] = 0xFF000000u | layers[(p >> 4) & 3][p & 3];
+			}
 		}
 	}
 
@@ -647,10 +695,13 @@ private:
 
 		const bool palette = Has(held, GamepadButtons::Y) || ch('P');
 		const bool scaling = Has(held, GamepadButtons::LeftThumbstick) || ch('F');
+		const bool border = Has(held, GamepadButtons::RightThumbstick) || ch('G');
 		s.nextPalette = palette && !m_paletteHeld;
-		s.toggleScaling = scaling && !m_scalingHeld;
+		s.nextScaling = scaling && !m_scalingHeld;
+		s.toggleBorder = border && !m_borderHeld;
 		m_paletteHeld = palette;
 		m_scalingHeld = scaling;
+		m_borderHeld = border;
 		return s;
 	}
 
@@ -658,14 +709,22 @@ private:
 	{
 		if (input.nextPalette)
 		{
-			m_paletteIndex = (m_paletteIndex + 1) % GameConfig::kPaletteCount;
-			ShowOverlay(std::wstring(L"Colours: ") + GameConfig::kPalettes[m_paletteIndex].name);
+			m_colourMode = (m_colourMode + 1) % kColourModeCount;
+			ShowOverlay(L"Colours: " + ColourModeName());
 			SaveSettings();
 		}
-		if (input.toggleScaling)
+		if (input.nextScaling)
 		{
-			m_integerScale = !m_integerScale;
-			ShowOverlay(m_integerScale ? L"Scaling: pixel-perfect" : L"Scaling: fill screen");
+			m_scaleMode = static_cast<ScaleMode>((static_cast<int32_t>(m_scaleMode) + 1) % kScaleModeCount);
+			ShowOverlay(m_scaleMode == ScaleMode::PixelPerfect ? L"Scaling: pixel-perfect"
+				: m_scaleMode == ScaleMode::Fit ? L"Scaling: fit to screen"
+				: L"Scaling: stretch to fill (widescreen)");
+			SaveSettings();
+		}
+		if (input.toggleBorder)
+		{
+			m_border = !m_border;
+			ShowOverlay(m_border ? L"Border: on" : L"Border: off");
 			SaveSettings();
 		}
 
@@ -687,16 +746,20 @@ private:
 	void LoadSettings()
 	{
 		const auto values = ApplicationData::Current().LocalSettings().Values();
-		const int palette = unbox_value_or<int32_t>(values.TryLookup(L"palette"), 0);
-		m_paletteIndex = (palette >= 0 && palette < GameConfig::kPaletteCount) ? palette : 0;
-		m_integerScale = unbox_value_or<bool>(values.TryLookup(L"integerScale"), true);
+		const int32_t colours = unbox_value_or<int32_t>(values.TryLookup(L"colourMode"), 0);
+		m_colourMode = (colours >= 0 && colours < kColourModeCount) ? colours : 0;
+		const int32_t scale = unbox_value_or<int32_t>(values.TryLookup(L"scaleMode"),
+			static_cast<int32_t>(ScaleMode::Fit));
+		m_scaleMode = static_cast<ScaleMode>((scale >= 0 && scale < kScaleModeCount) ? scale : 1);
+		m_border = unbox_value_or<bool>(values.TryLookup(L"border"), true);
 	}
 
 	void SaveSettings()
 	{
 		const auto values = ApplicationData::Current().LocalSettings().Values();
-		values.Insert(L"palette", box_value(static_cast<int32_t>(m_paletteIndex)));
-		values.Insert(L"integerScale", box_value(m_integerScale));
+		values.Insert(L"colourMode", box_value(static_cast<int32_t>(m_colourMode)));
+		values.Insert(L"scaleMode", box_value(static_cast<int32_t>(m_scaleMode)));
+		values.Insert(L"border", box_value(m_border));
 	}
 
 	void OnActivated(CoreApplicationView const &, IActivatedEventArgs const &)
@@ -744,12 +807,16 @@ private:
 	int m_framesSinceSaveCheck = 0;
 
 	std::vector<uint32_t> m_pixels;
-	int m_paletteIndex = 0;
-	bool m_integerScale = true;
+	UINT m_pixelsWidth = GBCORE_WIDTH;
+	UINT m_pixelsHeight = GBCORE_HEIGHT;
+	int m_colourMode = 0;
+	ScaleMode m_scaleMode = ScaleMode::Fit;
+	bool m_border = true;
 
 	bool m_keys[256] = {};
 	bool m_paletteHeld = false;
 	bool m_scalingHeld = false;
+	bool m_borderHeld = false;
 };
 
 int __stdcall wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
