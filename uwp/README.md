@@ -114,6 +114,7 @@ uwp/
     GameConfig.h             Per-game title, save name and palettes
     GameApp.props/.targets   Shared MSBuild settings; copies the ROM in as Game.gb
   External/PeanutGB/         Vendored emulator and APU cores (MIT)
-  tools/make_assets.py       Regenerates the tile and splash images
+  art/                       Cover art the tiles and splash screens are made from
+  tools/make_assets.py       Regenerates the tile and splash images from art/
   build.ps1                  Builds and signs the packages
 ```

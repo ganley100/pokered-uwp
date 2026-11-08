@@ -3,18 +3,22 @@
 
 Usage: python3 uwp/tools/make_assets.py   (needs Pillow)
 Writes PokemonRed/Assets and PokemonBlue/Assets next to this folder.
+
+If uwp/art/red.png or uwp/art/blue.png exists, that cover art is used:
+square images show the whole cover, and wide images centre it over a
+blurred copy of itself. Otherwise a plain emblem is drawn.
 """
 import os
 import sys
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 UWP = os.path.dirname(HERE)
 
 GAMES = {
-    "PokemonRed": {"label": "RED", "bg": (184, 40, 44), "accent": (232, 72, 64)},
-    "PokemonBlue": {"label": "BLUE", "bg": (40, 80, 184), "accent": (72, 120, 232)},
+    "PokemonRed": {"label": "RED", "art": "red.png", "bg": (184, 40, 44), "accent": (232, 72, 64)},
+    "PokemonBlue": {"label": "BLUE", "art": "blue.png", "bg": (40, 80, 184), "accent": (72, 120, 232)},
 }
 
 # name: (width, height, draw_label)
@@ -75,13 +79,37 @@ def render(game, width, height, label, scale):
     return img.resize((w, h), Image.LANCZOS)
 
 
+def render_art(art, width, height, scale):
+    w, h = width * scale // 100, height * scale // 100
+    if w == h:
+        return art.resize((w, h), Image.LANCZOS)
+
+    # Background: the cover stretched to cover the image and blurred.
+    cover = max(w / art.width, h / art.height)
+    bw, bh = round(art.width * cover), round(art.height * cover)
+    back = art.resize((bw, bh), Image.LANCZOS)
+    back = back.crop(((bw - w) // 2, (bh - h) // 2, (bw - w) // 2 + w, (bh - h) // 2 + h))
+    back = back.filter(ImageFilter.GaussianBlur(radius=max(w, h) / 25))
+
+    # Foreground: the whole cover, as large as fits.
+    side = min(w, h)
+    front = art.resize((side, side), Image.LANCZOS)
+    back.paste(front, ((w - side) // 2, (h - side) // 2))
+    return back
+
+
 def main():
     for project, game in GAMES.items():
         out = os.path.join(UWP, project, "Assets")
         os.makedirs(out, exist_ok=True)
+        art_path = os.path.join(UWP, "art", game["art"])
+        art = Image.open(art_path).convert("RGB") if os.path.exists(art_path) else None
         for name, (width, height, label) in IMAGES.items():
             for scale in SCALES:
-                img = render(game, width, height, label, scale)
+                if art is not None:
+                    img = render_art(art, width, height, scale)
+                else:
+                    img = render(game, width, height, label, scale)
                 img.save(os.path.join(out, f"{name}.scale-{scale}.png"), optimize=True)
         print(f"wrote {out}")
     return 0
