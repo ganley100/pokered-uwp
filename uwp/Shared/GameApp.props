@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Everything the Pokémon Red and Pokémon Blue app projects have in common.
+  The package contents (manifest, images, Game.gb) are listed in each .vcxproj:
+  the packaging step only picks them up from there.
   Each .vcxproj sets these before importing this file:
     PokeGameDefine  POKE_GAME_RED or POKE_GAME_BLUE (selects Shared/GameConfig.h)
     PokeGameRom     ROM file name in the repository root, built by `make`
@@ -94,18 +96,5 @@
     <ClInclude Include="$(MSBuildThisFileDirectory)GbCore.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\External\PeanutGB\peanut_gb.h" />
     <ClInclude Include="$(MSBuildThisFileDirectory)..\External\PeanutGB\minigb_apu.h" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <AppxManifest Include="Package.appxmanifest">
-      <SubType>Designer</SubType>
-    </AppxManifest>
-    <Image Include="Assets\*.png">
-      <DeploymentContent>true</DeploymentContent>
-    </Image>
-    <!-- Copied from the repository root by PokeCopyRom (GameApp.targets). -->
-    <None Include="Game.gb">
-      <DeploymentContent>true</DeploymentContent>
-    </None>
   </ItemGroup>
 </Project>

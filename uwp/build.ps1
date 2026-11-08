@@ -104,7 +104,8 @@ foreach ($g in $games) {
             '/p:GenerateAppxPackageOnBuild=true' '/p:AppxBundle=Never' `
             '/p:AppxPackageSigningEnabled=true' `
             "/p:PackageCertificateKeyFile=$($cert.Pfx)" `
-            "/p:PackageCertificatePassword=$($cert.Password)"
+            "/p:PackageCertificatePassword=$($cert.Password)" `
+            "/bl:$(Join-Path $uwp "logs\$name.binlog")"
         if ($LASTEXITCODE -ne 0) { throw "MSBuild failed for $name (exit code $LASTEXITCODE)." }
     }
     finally {

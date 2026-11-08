@@ -39,3 +39,4 @@ uwp/**/x64/
 uwp/**/Generated Files/
 uwp/.vs/
 *.vcxproj.user
+uwp/logs/

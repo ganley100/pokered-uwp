@@ -83,3 +83,11 @@ jobs:
           name: Pokemon${{ matrix.game }}-Xbox
           path: dist/Pokemon${{ matrix.game }}
           if-no-files-found: error
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pokemon${{ matrix.game }}-buildlog
+          path: uwp/logs
+          retention-days: 7
