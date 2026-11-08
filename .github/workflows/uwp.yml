@@ -1,0 +1,85 @@
+name: UWP (Xbox)
+
+# Builds Pokémon Red and Pokémon Blue as two separate sideloadable UWP packages
+# for Xbox Developer Mode. Each package contains the game ROM, so keep this
+# repository and its workflow artifacts private.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  rgbds_version: v1.0.4
+
+jobs:
+  roms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Checkout rgbds
+        uses: actions/checkout@v7
+        with:
+          path: rgbds
+          ref: ${{ env.rgbds_version }}
+          repository: gbdev/rgbds
+
+      - name: Install rgbds
+        working-directory: rgbds
+        run: |
+          sudo apt-get update
+          sudo apt-get install -yq bison libpng-dev pkg-config
+          sudo make -j$(nproc) install
+
+      - name: Remove rgbds
+        run: rm -rf rgbds
+
+      - name: Build ROMs
+        run: make -j$(nproc) red blue
+
+      - name: Upload ROMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: roms
+          path: |
+            pokered.gbc
+            pokeblue.gbc
+          retention-days: 1
+          if-no-files-found: error
+
+  package:
+    needs: roms
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        game: [Red, Blue]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download ROMs
+        uses: actions/download-artifact@v4
+        with:
+          name: roms
+          path: .
+
+      - name: Build and sign package
+        shell: powershell
+        env:
+          # Optional: a fixed signing certificate, so new builds install as
+          # updates. Without these a throwaway certificate is generated.
+          SIGNING_CERT_PFX_BASE64: ${{ secrets.SIGNING_CERT_PFX_BASE64 }}
+          SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: >
+          .\uwp\build.ps1 -Game ${{ matrix.game }} -Configuration Release
+          -Version "1.0.${{ github.run_number }}.0" -OutDir "${{ github.workspace }}\dist"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Pokemon${{ matrix.game }}-Xbox
+          path: dist/Pokemon${{ matrix.game }}
+          if-no-files-found: error

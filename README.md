@@ -12,6 +12,8 @@ It builds the following ROMs:
 
 To set up the repository, see [**INSTALL.md**](INSTALL.md).
 
+To build Red and Blue as separate UWP apps for Xbox Developer Mode, see [**uwp/README.md**](uwp/README.md).
+
 
 ## See also
 

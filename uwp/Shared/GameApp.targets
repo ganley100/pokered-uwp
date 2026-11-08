@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+
+  <!-- Put the ROM built by `make` into the project as Game.gb so that it is
+       packaged with the app. Override the source with /p:PokeRomPath=... -->
+  <Target Name="PokeCopyRom" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(PokeRomPath)') And !Exists('$(ProjectDir)Game.gb')"
+           Text="$(PokeGameRom) was not found at $(PokeRomPath). Build it first by running `make` in the repository root (see uwp/README.md), or pass /p:PokeRomPath=path\to\rom." />
+    <Copy Condition="Exists('$(PokeRomPath)')"
+          SourceFiles="$(PokeRomPath)"
+          DestinationFiles="$(ProjectDir)Game.gb"
+          SkipUnchangedFiles="true" />
+  </Target>
+</Project>

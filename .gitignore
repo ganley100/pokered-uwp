@@ -29,3 +29,13 @@
 *.sn*
 *.sa*
 *.sg1
+
+# UWP (Xbox) build output, see uwp/README.md
+uwp/**/Game.gb
+uwp/AppPackages/
+uwp/dist/
+uwp/cert/
+uwp/**/x64/
+uwp/**/Generated Files/
+uwp/.vs/
+*.vcxproj.user
