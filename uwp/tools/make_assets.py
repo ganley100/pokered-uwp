@@ -110,7 +110,10 @@ def main():
                     img = render_art(art, width, height, scale)
                 else:
                     img = render(game, width, height, label, scale)
-                img.save(os.path.join(out, f"{name}.scale-{scale}.png"), optimize=True)
+                # The 100% image is written without a qualifier so that the
+                # file the manifest names exists in the package as-is.
+                suffix = "" if scale == 100 else f".scale-{scale}"
+                img.save(os.path.join(out, f"{name}{suffix}.png"), optimize=True)
         print(f"wrote {out}")
     return 0
 
